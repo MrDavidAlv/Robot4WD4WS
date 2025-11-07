@@ -230,30 +230,30 @@ class FourWSKinematicsNode(Node):
             speed = math.sqrt(vx**2 + vy**2)
 
             # Normalize angle to stay within steering limits
-            # If angle > max_steering_angle, flip the wheel direction and invert velocity
+            # Strategy: if angle > 90°, flip wheels 180° and reverse velocity
             wheel_direction = 1.0
+
+            # Normalize angle to [-π, π]
             while angle > math.pi:
                 angle -= 2 * math.pi
             while angle < -math.pi:
                 angle += 2 * math.pi
 
-            # If angle exceeds limits, flip to opposite direction with negative velocity
+            # If angle is in back half (> 90° or < -90°), flip to front half with reverse velocity
+            if angle > math.pi / 2:
+                # Angle in range (90°, 180°] → flip to (-90°, 0°] with reverse
+                angle = angle - math.pi
+                wheel_direction = -1.0
+            elif angle < -math.pi / 2:
+                # Angle in range [-180°, -90°) → flip to [0°, 90°) with reverse
+                angle = angle + math.pi
+                wheel_direction = -1.0
+
+            # Now angle is in range [-90°, 90°], clamp to max_steering_angle
             if angle > self.max_steering_angle:
-                if angle > math.pi - self.max_steering_angle:
-                    # Closer to 180° - flip to negative angle
-                    angle = angle - math.pi
-                    wheel_direction = -1.0
-                else:
-                    # Clamp to max
-                    angle = self.max_steering_angle
+                angle = self.max_steering_angle
             elif angle < -self.max_steering_angle:
-                if angle < -math.pi + self.max_steering_angle:
-                    # Closer to -180° - flip to positive angle
-                    angle = angle + math.pi
-                    wheel_direction = -1.0
-                else:
-                    # Clamp to min
-                    angle = -self.max_steering_angle
+                angle = -self.max_steering_angle
 
             # All wheels point in same direction
             steering = {
