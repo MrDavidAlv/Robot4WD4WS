@@ -123,9 +123,9 @@ class XboxControlNode(Node):
             if self.current_mode != 'omnidirectional':
                 self.switch_mode('omnidirectional')
 
-            # Map to velocity (invert Y axis - pushing forward should be positive)
-            twist.linear.x = -left_vertical * self.max_linear_speed
-            twist.linear.y = -left_horizontal * self.max_linear_speed
+            # Map to velocity (joystick up = positive linear.x = forward)
+            twist.linear.x = left_vertical * self.max_linear_speed
+            twist.linear.y = left_horizontal * self.max_linear_speed
             twist.angular.z = 0.0
 
         elif right_magnitude > 0.0:
@@ -133,9 +133,9 @@ class XboxControlNode(Node):
             if self.current_mode != 'crab':
                 self.switch_mode('crab')
 
-            # Map to velocity (invert Y axis - pushing forward should be positive)
-            twist.linear.x = -right_vertical * self.max_linear_speed
-            twist.linear.y = -right_horizontal * self.max_linear_speed
+            # Map to velocity (joystick up = positive linear.x = forward)
+            twist.linear.x = right_vertical * self.max_linear_speed
+            twist.linear.y = right_horizontal * self.max_linear_speed
             twist.angular.z = 0.0
 
         else:
