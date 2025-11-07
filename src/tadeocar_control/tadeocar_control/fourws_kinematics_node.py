@@ -229,6 +229,32 @@ class FourWSKinematicsNode(Node):
             angle = math.atan2(vy, vx)
             speed = math.sqrt(vx**2 + vy**2)
 
+            # Normalize angle to stay within steering limits
+            # If angle > max_steering_angle, flip the wheel direction and invert velocity
+            wheel_direction = 1.0
+            while angle > math.pi:
+                angle -= 2 * math.pi
+            while angle < -math.pi:
+                angle += 2 * math.pi
+
+            # If angle exceeds limits, flip to opposite direction with negative velocity
+            if angle > self.max_steering_angle:
+                if angle > math.pi - self.max_steering_angle:
+                    # Closer to 180° - flip to negative angle
+                    angle = angle - math.pi
+                    wheel_direction = -1.0
+                else:
+                    # Clamp to max
+                    angle = self.max_steering_angle
+            elif angle < -self.max_steering_angle:
+                if angle < -math.pi + self.max_steering_angle:
+                    # Closer to -180° - flip to positive angle
+                    angle = angle + math.pi
+                    wheel_direction = -1.0
+                else:
+                    # Clamp to min
+                    angle = -self.max_steering_angle
+
             # All wheels point in same direction
             steering = {
                 'front_left': angle,
@@ -237,8 +263,8 @@ class FourWSKinematicsNode(Node):
                 'rear_right': angle
             }
 
-            # Convert linear speed to wheel angular velocity
-            wheel_vel = speed / self.wheel_radius
+            # Convert linear speed to wheel angular velocity (with direction flip if needed)
+            wheel_vel = (speed / self.wheel_radius) * wheel_direction
 
             # Add rotational component
             if abs(wz) > 0.001:
