@@ -126,6 +126,18 @@ def generate_launch_description():
         }]
     )
 
+    # 4WS Odometry Node (calculates odometry from all 4 wheels) - DISABLED TEMPORARILY
+    # TODO: Debug and re-enable once working properly
+    # fourws_odometry = Node(
+    #     package='tadeocar_control',
+    #     executable='fourws_odometry',
+    #     name='fourws_odometry_node',
+    #     output='screen',
+    #     parameters=[{
+    #         'use_sim_time': use_sim_time
+    #     }]
+    # )
+
     # Gazebo Effort Bridge
     gazebo_bridge = Node(
         package='tadeocar_control',
@@ -187,6 +199,7 @@ def generate_launch_description():
         joy_node,
         xbox_control,
         fourws_kinematics,
+        # fourws_odometry,  # Disabled temporarily - using diff_drive plugin for now
         gazebo_bridge,
         # laser_filter_node,  # Disabled - using range min in LIDAR config instead
         slam_toolbox_node,

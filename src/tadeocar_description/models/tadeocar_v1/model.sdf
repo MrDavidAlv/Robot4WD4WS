@@ -708,7 +708,8 @@
       <parameters>/home/axioma/ros2/TadeoeCar-ws/install/tadeocar_control/share/tadeocar_control/config/ros2_controllers.yaml</parameters>
     </plugin>
 
-    <!-- Differential Drive Plugin for Odometry -->
+    <!-- Differential Drive Plugin for Odometry - TEMPORARY FALLBACK -->
+    <!-- TODO: Replace with fourws_odometry_node once debugging is complete -->
     <plugin name="diff_drive" filename="libgazebo_ros_diff_drive.so">
       <update_rate>50</update_rate>
       <left_joint>front_left_wheel_joint</left_joint>
