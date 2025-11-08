@@ -13,78 +13,111 @@
   <!-- Base Link -->
   <link name="base_link">
     <inertial>
-      <mass value="20.0"/>
+      <mass value="50.0"/>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+      <inertia ixx="4.0" ixy="0.0" ixz="0.0" iyy="4.0" iyz="0.0" izz="2.0"/>
     </inertial>
+    <visual>
+      <origin xyz="0 0 0.155" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tadeocar_description/models/tadeocar_v1/meshes/chassis/chasis_base.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
   </link>
 
   <!-- Chassis Link -->
   <link name="chasis_link">
     <inertial>
-      <mass value="15.0"/>
+      <mass value="20.0"/>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.5" ixy="0.0" ixz="0.0" iyy="0.5" iyz="0.0" izz="0.5"/>
+      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="0.5"/>
     </inertial>
+    <visual>
+      <origin xyz="-0.49 0.39 -0.126" rpy="1.5708 0 3.14159"/>
+      <geometry>
+        <mesh filename="package://tadeocar_description/models/tadeocar_v1/meshes/chassis/chasis.dae" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
   </link>
 
   <joint name="chasis_joint" type="fixed">
     <parent link="base_link"/>
     <child link="chasis_link"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <origin xyz="0 0 0.35" rpy="0 0 0"/>
   </joint>
 
   <!-- LiDAR Link -->
-  <link name="base_scan"/>
+  <link name="base_scan">
+    <inertial>
+      <mass value="0.125"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.035" length="0.030"/>
+      </geometry>
+      <material name="lidar_color">
+        <color rgba="0.1 0.1 0.1 1.0"/>
+      </material>
+    </visual>
+  </link>
 
   <joint name="lidar_joint" type="fixed">
     <parent link="base_link"/>
     <child link="base_scan"/>
-    <origin xyz="0 0 0.30" rpy="0 0 0"/>
+    <origin xyz="0.55 0 0.33" rpy="0 0 0"/>
   </joint>
 
   <!-- Steering Links -->
-  <xacro:macro name="steering_link" params="prefix">
+  <xacro:macro name="steering_link" params="prefix reflect_yaw">
     <link name="${prefix}_steering_link">
       <inertial>
-        <mass value="0.5"/>
+        <mass value="2.0"/>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.01"/>
       </inertial>
+      <visual>
+        <origin xyz="0 0 0.227" rpy="0 3.14159 ${reflect_yaw}"/>
+        <geometry>
+          <mesh filename="package://tadeocar_description/models/tadeocar_v1/meshes/suspension/suspension.dae" scale="1 1 1"/>
+        </geometry>
+      </visual>
     </link>
   </xacro:macro>
 
-  <xacro:steering_link prefix="front_left"/>
-  <xacro:steering_link prefix="front_right"/>
-  <xacro:steering_link prefix="rear_left"/>
-  <xacro:steering_link prefix="rear_right"/>
+  <xacro:steering_link prefix="front_left" reflect_yaw="3.14159"/>
+  <xacro:steering_link prefix="front_right" reflect_yaw="-3.14159"/>
+  <xacro:steering_link prefix="rear_left" reflect_yaw="0"/>
+  <xacro:steering_link prefix="rear_right" reflect_yaw="0"/>
 
   <!-- Steering Joints -->
   <joint name="front_left_steering_joint" type="continuous">
-    <parent link="chasis_link"/>
+    <parent link="base_link"/>
     <child link="front_left_steering_link"/>
-    <origin xyz="0.3 0.25 0" rpy="0 0 0"/>
+    <origin xyz="0.478 0.275 0" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
   </joint>
 
   <joint name="front_right_steering_joint" type="continuous">
-    <parent link="chasis_link"/>
+    <parent link="base_link"/>
     <child link="front_right_steering_link"/>
-    <origin xyz="0.3 -0.25 0" rpy="0 0 0"/>
+    <origin xyz="0.478 -0.275 0" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
   </joint>
 
   <joint name="rear_left_steering_joint" type="continuous">
-    <parent link="chasis_link"/>
+    <parent link="base_link"/>
     <child link="rear_left_steering_link"/>
-    <origin xyz="-0.3 0.25 0" rpy="0 0 0"/>
+    <origin xyz="-0.58 0.275 0" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
   </joint>
 
   <joint name="rear_right_steering_joint" type="continuous">
-    <parent link="chasis_link"/>
+    <parent link="base_link"/>
     <child link="rear_right_steering_link"/>
-    <origin xyz="-0.3 -0.25 0" rpy="0 0 0"/>
+    <origin xyz="-0.58 -0.275 0" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
   </joint>
 
@@ -92,10 +125,16 @@
   <xacro:macro name="wheel_link" params="prefix">
     <link name="${prefix}_wheel_link">
       <inertial>
-        <mass value="1.0"/>
+        <mass value="3.0"/>
         <origin xyz="0 0 0" rpy="0 0 0"/>
-        <inertia ixx="0.02" ixy="0.0" ixz="0.0" iyy="0.02" iyz="0.0" izz="0.02"/>
+        <inertia ixx="0.1" ixy="0.0" ixz="0.0" iyy="0.1" iyz="0.0" izz="0.1"/>
       </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+        <geometry>
+          <mesh filename="package://tadeocar_description/models/tadeocar_v1/meshes/wheels/wheel.dae" scale="1 1 1"/>
+        </geometry>
+      </visual>
     </link>
   </xacro:macro>
 
@@ -108,28 +147,28 @@
   <joint name="front_left_wheel_joint" type="continuous">
     <parent link="front_left_steering_link"/>
     <child link="front_left_wheel_link"/>
-    <origin xyz="0 0 -0.1" rpy="0 0 0"/>
+    <origin xyz="0.05 0 0" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
   </joint>
 
   <joint name="front_right_wheel_joint" type="continuous">
     <parent link="front_right_steering_link"/>
     <child link="front_right_wheel_link"/>
-    <origin xyz="0 0 -0.1" rpy="0 0 0"/>
+    <origin xyz="0.05 0 0" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
   </joint>
 
   <joint name="rear_left_wheel_joint" type="continuous">
     <parent link="rear_left_steering_link"/>
     <child link="rear_left_wheel_link"/>
-    <origin xyz="0 0 -0.1" rpy="0 0 0"/>
+    <origin xyz="-0.05 0 0" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
   </joint>
 
   <joint name="rear_right_wheel_joint" type="continuous">
     <parent link="rear_right_steering_link"/>
     <child link="rear_right_wheel_link"/>
-    <origin xyz="0 0 -0.1" rpy="0 0 0"/>
+    <origin xyz="-0.05 0 0" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
   </joint>
 
