@@ -38,7 +38,10 @@ class FourWSKinematicsNode(Node):
         # Speed limits
         self.max_linear_speed = 2.0  # m/s
         self.max_angular_speed = 1.0  # rad/s
-        self.max_steering_angle = 0.5  # radians (~28.6 degrees)
+        self.max_steering_angle = 1.57  # radians (~90 degrees) for testing full range
+
+        # Physical steering limits (270 degrees = ±135 degrees = ±2.356 rad)
+        self.max_physical_steering = math.pi * 0.75  # 135 degrees in radians
 
         # Current joint states
         self.current_steering = {
@@ -229,31 +232,11 @@ class FourWSKinematicsNode(Node):
             angle = math.atan2(vy, vx)
             speed = math.sqrt(vx**2 + vy**2)
 
-            # Normalize angle to stay within steering limits
-            # Strategy: if angle > 90°, flip wheels 180° and reverse velocity
-            wheel_direction = 1.0
+            # Normalize angle to [-pi/2, pi/2] with velocity inversion if needed
+            angle, wheel_direction = self.normalize_steering_angle(angle)
 
-            # Normalize angle to [-π, π]
-            while angle > math.pi:
-                angle -= 2 * math.pi
-            while angle < -math.pi:
-                angle += 2 * math.pi
-
-            # If angle is in back half (> 90° or < -90°), flip to front half with reverse velocity
-            if angle > math.pi / 2:
-                # Angle in range (90°, 180°] → flip to (-90°, 0°] with reverse
-                angle = angle - math.pi
-                wheel_direction = -1.0
-            elif angle < -math.pi / 2:
-                # Angle in range [-180°, -90°) → flip to [0°, 90°) with reverse
-                angle = angle + math.pi
-                wheel_direction = -1.0
-
-            # Now angle is in range [-90°, 90°], clamp to max_steering_angle
-            if angle > self.max_steering_angle:
-                angle = self.max_steering_angle
-            elif angle < -self.max_steering_angle:
-                angle = -self.max_steering_angle
+            # Clamp to max_steering_angle
+            angle = self.clamp(angle, -self.max_steering_angle, self.max_steering_angle)
 
             # All wheels point in same direction
             steering = {
@@ -464,12 +447,17 @@ class FourWSKinematicsNode(Node):
             # Get current steering angle
             current_angle = self.current_steering[wheel]
 
-            # Calculate error
-            error = target_angle - current_angle
+            # Calculate shortest path error
+            error = self.compute_shortest_path(current_angle, target_angle)
+
+            # Safety check: prevent movement if target exceeds physical limits
+            target_normalized = self.normalize_angle(target_angle)
+            if abs(target_normalized) > self.max_physical_steering:
+                self.get_logger().warn(f'{wheel} target angle {target_normalized:.2f} exceeds physical limit')
+                error = 0.0
 
             # Calculate steering velocity (proportional control)
-            # Higher gain = faster steering response
-            steering_velocity = 5.0 * error  # Gain of 5.0 rad/s per radian of error
+            steering_velocity = 5.0 * error
 
             # Clamp steering velocity
             steering_velocity = self.clamp(steering_velocity, -10.0, 10.0)
@@ -488,6 +476,52 @@ class FourWSKinematicsNode(Node):
             msg = Float64MultiArray()
             msg.data = [velocity]
             self.wheel_pubs[wheel].publish(msg)
+
+    @staticmethod
+    def normalize_angle(angle):
+        """Normalize angle to [-pi, pi]"""
+        while angle > math.pi:
+            angle -= 2 * math.pi
+        while angle < -math.pi:
+            angle += 2 * math.pi
+        return angle
+
+    @staticmethod
+    def normalize_steering_angle(target_angle):
+        """
+        Normalize steering angle to [-pi/2, pi/2] range
+        Returns: (normalized_angle, direction_multiplier)
+        If angle is outside [-pi/2, pi/2], flip it and return -1 to invert wheel velocity
+        """
+        # First normalize to [-pi, pi]
+        angle = FourWSKinematicsNode.normalize_angle(target_angle)
+        direction = 1.0
+
+        # If angle is outside [-pi/2, pi/2], flip it by 180° and invert direction
+        if angle > math.pi / 2:
+            angle = angle - math.pi
+            direction = -1.0
+        elif angle < -math.pi / 2:
+            angle = angle + math.pi
+            direction = -1.0
+
+        return angle, direction
+
+    def compute_shortest_path(self, current_angle, target_angle):
+        """
+        Compute shortest path from current to target angle
+        Considering physical limit of ±135° (270° total range)
+        Returns: steering velocity to reach target
+        """
+        # Normalize both angles to [-pi, pi]
+        current = self.normalize_angle(current_angle)
+        target = self.normalize_angle(target_angle)
+
+        # Calculate error (shortest path)
+        error = target - current
+        error = self.normalize_angle(error)
+
+        return error
 
     @staticmethod
     def clamp(value, min_val, max_val):
