@@ -1,35 +1,27 @@
 #!/usr/bin/env python3
 """
-Save map launch file
-Saves current SLAM map to file
+Save SLAM Map
+Saves the current map to tadeocar_navigation/maps/mapa
 """
 
+import os
 from launch import LaunchDescription
 from launch.actions import ExecuteProcess
-from launch.substitutions import LaunchConfiguration
-from launch.actions import DeclareLaunchArgument
+from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
-    """Save current map"""
 
-    # Launch arguments
-    map_name = LaunchConfiguration('map_name', default='my_map')
+    pkg_navigation = get_package_share_directory('tadeocar_navigation')
+    maps_dir = os.path.join(pkg_navigation, 'maps')
+    map_path = os.path.join(maps_dir, 'mapa')
 
-    declare_map_name = DeclareLaunchArgument(
-        'map_name',
-        default_value='my_map',
-        description='Name for the saved map file'
-    )
-
-    # Save map
     save_map = ExecuteProcess(
         cmd=['ros2', 'run', 'nav2_map_server', 'map_saver_cli',
-             '-f', map_name],
+             '-f', map_path],
         output='screen'
     )
 
     return LaunchDescription([
-        declare_map_name,
         save_map
     ])
