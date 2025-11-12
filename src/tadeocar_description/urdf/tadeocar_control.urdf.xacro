@@ -70,6 +70,111 @@
     <origin xyz="0.55 0 0.33" rpy="0 0 0"/>
   </joint>
 
+  <!-- Stereo Camera Base Link -->
+  <link name="stereo_camera_base">
+    <inertial>
+      <mass value="0.1"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0001" ixy="0.0" ixz="0.0" iyy="0.0001" iyz="0.0" izz="0.0001"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 1.5708"/>
+      <geometry>
+        <box size="0.15 0.05 0.03"/>
+      </geometry>
+      <material name="camera_color">
+        <color rgba="0.2 0.2 0.2 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 1.5708"/>
+      <geometry>
+        <box size="0.15 0.05 0.03"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="stereo_camera_base_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="stereo_camera_base"/>
+    <origin xyz="0.55 0 0.40" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Left Camera Link -->
+  <link name="camera_left">
+    <inertial>
+      <mass value="0.05"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00001" ixy="0.0" ixz="0.0" iyy="0.00001" iyz="0.0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 1.5708 0"/>
+      <geometry>
+        <cylinder radius="0.01" length="0.01"/>
+      </geometry>
+      <material name="camera_lens">
+        <color rgba="0.1 0.1 0.1 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 1.5708 0"/>
+      <geometry>
+        <cylinder radius="0.01" length="0.01"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="camera_left_joint" type="fixed">
+    <parent link="stereo_camera_base"/>
+    <child link="camera_left"/>
+    <origin xyz="0.03 0.06 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Right Camera Link -->
+  <link name="camera_right">
+    <inertial>
+      <mass value="0.05"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00001" ixy="0.0" ixz="0.0" iyy="0.00001" iyz="0.0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 1.5708 0"/>
+      <geometry>
+        <cylinder radius="0.01" length="0.01"/>
+      </geometry>
+      <material name="camera_lens">
+        <color rgba="0.1 0.1 0.1 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 1.5708 0"/>
+      <geometry>
+        <cylinder radius="0.01" length="0.01"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="camera_right_joint" type="fixed">
+    <parent link="stereo_camera_base"/>
+    <child link="camera_right"/>
+    <origin xyz="0.03 -0.06 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Camera Optical Frames (for image topics) -->
+  <link name="camera_left_optical"/>
+  <joint name="camera_left_optical_joint" type="fixed">
+    <parent link="camera_left"/>
+    <child link="camera_left_optical"/>
+    <origin xyz="0.005 0 0" rpy="-1.5708 0 -1.5708"/>
+  </joint>
+
+  <link name="camera_right_optical"/>
+  <joint name="camera_right_optical_joint" type="fixed">
+    <parent link="camera_right"/>
+    <child link="camera_right_optical"/>
+    <origin xyz="0.005 0 0" rpy="-1.5708 0 -1.5708"/>
+  </joint>
+
   <!-- Steering Links -->
   <xacro:macro name="steering_link" params="prefix reflect_yaw">
     <link name="${prefix}_steering_link">
@@ -265,6 +370,92 @@
       <robot_param_node>robot_state_publisher</robot_param_node>
       <parameters>$(arg controllers_file)</parameters>
     </plugin>
+  </gazebo>
+
+  <!-- Gazebo properties for stereo camera base -->
+  <gazebo reference="stereo_camera_base">
+    <gravity>false</gravity>
+    <kinematic>true</kinematic>
+  </gazebo>
+
+  <!-- Gazebo properties for left camera -->
+  <gazebo reference="camera_left">
+    <gravity>false</gravity>
+    <kinematic>true</kinematic>
+  </gazebo>
+
+  <!-- Gazebo properties for right camera -->
+  <gazebo reference="camera_right">
+    <gravity>false</gravity>
+    <kinematic>true</kinematic>
+  </gazebo>
+
+  <!-- Gazebo plugin for left camera -->
+  <gazebo reference="camera_left">
+    <sensor type="camera" name="camera_left_sensor">
+      <update_rate>30.0</update_rate>
+      <camera name="left">
+        <horizontal_fov>1.3962634</horizontal_fov>
+        <image>
+          <width>1280</width>
+          <height>720</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.02</near>
+          <far>300</far>
+        </clip>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.007</stddev>
+        </noise>
+      </camera>
+      <plugin name="camera_left_controller" filename="libgazebo_ros_camera.so">
+        <ros>
+          <namespace>/</namespace>
+          <remapping>~/image_raw:=camera/left/image_raw</remapping>
+          <remapping>~/camera_info:=camera/left/camera_info</remapping>
+        </ros>
+        <camera_name>camera_left</camera_name>
+        <frame_name>camera_left_optical</frame_name>
+        <hack_baseline>0.12</hack_baseline>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <!-- Gazebo plugin for right camera -->
+  <gazebo reference="camera_right">
+    <sensor type="camera" name="camera_right_sensor">
+      <update_rate>30.0</update_rate>
+      <camera name="right">
+        <horizontal_fov>1.3962634</horizontal_fov>
+        <image>
+          <width>1280</width>
+          <height>720</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.02</near>
+          <far>300</far>
+        </clip>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.007</stddev>
+        </noise>
+      </camera>
+      <plugin name="camera_right_controller" filename="libgazebo_ros_camera.so">
+        <ros>
+          <namespace>/</namespace>
+          <remapping>~/image_raw:=camera/right/image_raw</remapping>
+          <remapping>~/camera_info:=camera/right/camera_info</remapping>
+        </ros>
+        <camera_name>camera_right</camera_name>
+        <frame_name>camera_right_optical</frame_name>
+        <hack_baseline>0.12</hack_baseline>
+      </plugin>
+    </sensor>
   </gazebo>
 
 </robot>
