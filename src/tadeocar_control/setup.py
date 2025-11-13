@@ -27,6 +27,7 @@ setup(
             'web_control = tadeocar_control.web_control_node:main',
             'fourws_kinematics = tadeocar_control.fourws_kinematics_node:main',
             'xbox_control = tadeocar_control.xbox_control_node:main',
+            'cmd_vel_relay = tadeocar_control.cmd_vel_relay_node:main',
         ],
     },
 )

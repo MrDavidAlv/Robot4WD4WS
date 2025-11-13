@@ -99,23 +99,15 @@ class FourWSKinematicsNode(Node):
             )
         }
 
-        # PID gains
-        self.kp_steering = 50.0  # Proportional gain for steering
-        self.kp_wheel = 10.0      # Proportional gain for wheels
+        # Control gains
+        self.kp_steering = 15.0
+        self.max_steering_vel = 20.0
 
         # Subscribers
-        # Xbox/manual control → omnidirectional mode
+        # Unified cmd_vel for both Xbox and Nav2 (both use omnidirectional mode)
         self.cmd_vel_sub = self.create_subscription(
             Twist,
             '/cmd_vel',
-            lambda msg: self.cmd_vel_callback(msg, source='xbox'),
-            10
-        )
-
-        # Nav2 commands → crab mode (allows rotation)
-        self.cmd_vel_nav_sub = self.create_subscription(
-            Twist,
-            '/cmd_vel_nav',
             lambda msg: self.cmd_vel_callback(msg, source='nav2'),
             10
         )
@@ -181,14 +173,9 @@ class FourWSKinematicsNode(Node):
 
         # Select mode based on source
         if source == 'nav2':
-            # Nav2 → Use crab mode (allows rotation for path following)
-            # Crab mode combines linear motion with rotation
-            if abs(angular_z) > 0.001:
-                # Use ackermann mode for rotation (turns in place better)
-                steering, velocities = self.compute_ackermann(linear_x, angular_z)
-            else:
-                # Pure translation → crab mode
-                steering, velocities = self.compute_crab(linear_x, linear_y)
+            # Nav2 → Use omnidirectional mode (4WD4WS robot can do full omnidirectional motion)
+            # This allows simultaneous translation in any direction + rotation
+            steering, velocities = self.compute_omnidirectional(linear_x, linear_y, angular_z)
         else:
             # Xbox/manual control → Use current mode (omnidirectional by default)
             if self.mode == 'omnidirectional':
@@ -205,99 +192,36 @@ class FourWSKinematicsNode(Node):
         self.publish_commands(steering, velocities)
 
     def compute_omnidirectional(self, vx, vy, wz):
-        """
-        Omnidirectional mode: All wheels point in direction of motion
+        """4WD4WS omnidirectional kinematics: each wheel has independent angle"""
 
-        Args:
-            vx: Linear velocity in x (forward/backward)
-            vy: Linear velocity in y (left/right)
-            wz: Angular velocity (rotation)
+        # Wheel positions relative to robot center
+        wheel_positions = {
+            'front_left':  (self.wheel_base/2,  self.track_width/2),
+            'front_right': (self.wheel_base/2, -self.track_width/2),
+            'rear_left':   (-self.wheel_base/2, self.track_width/2),
+            'rear_right':  (-self.wheel_base/2, -self.track_width/2)
+        }
 
-        Returns:
-            steering: Dict of steering angles for each wheel
-            velocities: Dict of wheel velocities
-        """
-        # Compute direction angle from velocity components
-        if abs(vx) < 0.001 and abs(vy) < 0.001:
-            # Pure rotation or stopped
-            if abs(wz) > 0.001:
-                # Spin in place - 45 degree diamond pattern
-                steering = {
-                    'front_left': math.pi / 4,    # 45°
-                    'front_right': -math.pi / 4,  # -45°
-                    'rear_left': -math.pi / 4,    # -45°
-                    'rear_right': math.pi / 4     # 45°
-                }
+        steering = {}
+        velocities = {}
 
-                # Velocity proportional to distance from center
-                wheel_distance = math.sqrt((self.wheel_base/2)**2 + (self.track_width/2)**2)
-                base_vel = wz * wheel_distance / self.wheel_radius
+        for wheel, (x, y) in wheel_positions.items():
+            # Instantaneous velocity of each wheel
+            v_wheel_x = vx - wz * y
+            v_wheel_y = vy + wz * x
 
-                velocities = {
-                    'front_left': base_vel,
-                    'front_right': base_vel,
-                    'rear_left': base_vel,
-                    'rear_right': base_vel
-                }
+            # Steering angle for this wheel
+            if abs(v_wheel_x) < 0.001 and abs(v_wheel_y) < 0.001:
+                steering[wheel] = 0.0
+                velocities[wheel] = 0.0
             else:
-                # Stopped
-                steering = {
-                    'front_left': 0.0,
-                    'front_right': 0.0,
-                    'rear_left': 0.0,
-                    'rear_right': 0.0
-                }
-                velocities = {
-                    'front_left': 0.0,
-                    'front_right': 0.0,
-                    'rear_left': 0.0,
-                    'rear_right': 0.0
-                }
-        else:
-            # Translational motion (with possible rotation)
-            angle = math.atan2(vy, vx)
-            speed = math.sqrt(vx**2 + vy**2)
+                angle = math.atan2(v_wheel_y, v_wheel_x)
+                angle, direction = self.normalize_steering_angle(angle)
+                steering[wheel] = self.clamp(angle, -self.max_steering_angle, self.max_steering_angle)
 
-            # Normalize angle to [-pi/2, pi/2] with velocity inversion if needed
-            angle, wheel_direction = self.normalize_steering_angle(angle)
-
-            # Clamp to max_steering_angle
-            angle = self.clamp(angle, -self.max_steering_angle, self.max_steering_angle)
-
-            # All wheels point in same direction
-            steering = {
-                'front_left': angle,
-                'front_right': angle,
-                'rear_left': angle,
-                'rear_right': angle
-            }
-
-            # Convert linear speed to wheel angular velocity (with direction flip if needed)
-            wheel_vel = (speed / self.wheel_radius) * wheel_direction
-
-            # Add rotational component
-            if abs(wz) > 0.001:
-                # For rotation: left wheels and right wheels must have opposite velocities
-                wheel_distance = math.sqrt((self.wheel_base/2)**2 + (self.track_width/2)**2)
-                rot_contribution = wz * wheel_distance / self.wheel_radius
-
-                velocities = {
-                    'front_left': wheel_vel + rot_contribution,   # Left side: +rotation
-                    'front_right': wheel_vel - rot_contribution,  # Right side: -rotation (CORRECTED)
-                    'rear_left': wheel_vel + rot_contribution,    # Left side: +rotation
-                    'rear_right': wheel_vel - rot_contribution    # Right side: -rotation (CORRECTED)
-                }
-            else:
-                velocities = {
-                    'front_left': wheel_vel,
-                    'front_right': wheel_vel,
-                    'rear_left': wheel_vel,
-                    'rear_right': wheel_vel
-                }
-
-        # Clamp steering angles
-        for key in steering:
-            steering[key] = self.clamp(steering[key], -self.max_steering_angle, self.max_steering_angle)
+                # Wheel speed
+                speed = math.sqrt(v_wheel_x**2 + v_wheel_y**2)
+                velocities[wheel] = (speed / self.wheel_radius) * direction
 
         return steering, velocities
 
@@ -483,11 +407,8 @@ class FourWSKinematicsNode(Node):
                 self.get_logger().warn(f'{wheel} target angle {target_normalized:.2f} exceeds physical limit')
                 error = 0.0
 
-            # Calculate steering velocity (proportional control)
-            steering_velocity = 5.0 * error
-
-            # Clamp steering velocity
-            steering_velocity = self.clamp(steering_velocity, -10.0, 10.0)
+            steering_velocity = self.kp_steering * error
+            steering_velocity = self.clamp(steering_velocity, -self.max_steering_vel, self.max_steering_vel)
 
             # Publish as Float64MultiArray
             msg = Float64MultiArray()
